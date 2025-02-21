@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Leilão - Cliente</title>
+</head>
+<body>
+    <h2>Leilão em Andamento</h2>
+
+    <h3>Tempo Restante: <span id="timeLeft">60</span>s</h3>
+    <p>Valor Atual: R$ <span id="currentBid">0</span></p>
+    <button onclick="sendBid()">Dar Lance (+10%)</button>
+
+    <script>
+        const multicastPort = 5000;
+        const multicastAddress = "239.255.255.250";
+
+        const socket = new WebSocket("ws://localhost:3000");
+
+        socket.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+
+            if (data.type === "start") {
+                document.getElementById("currentBid").innerText = data.value;
+            } else if (data.type === "timer") {
+                document.getElementById("timeLeft").innerText = data.timeLeft;
+            } else if (data.type === "bid") {
+                document.getElementById("currentBid").innerText = data.bidValue;
+            } else if (data.type === "end") {
+                alert("Leilão encerrado!");
+            }
+        };
+
+        function sendBid() {
+            fetch("http://localhost:3000/bid", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" }
+            })
+            .then(response => response.json())
+            .then(data => alert(data.message))
+            .catch(error => console.error("Erro ao enviar lance:", error));
+        }
+    </script>
+</body>
+</html>
