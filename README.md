@@ -1,8 +1,11 @@
-<h1>Como rodar</h1>
+##Como rodar
 <p>Para rodar servidor</p>
 
-## Installation
+```
+node server.js
+```
+<p>Rodar cliente</p>
 
 ```
-$ npm install --save @github/clipboard-copy-element
+node client.js
 ```
