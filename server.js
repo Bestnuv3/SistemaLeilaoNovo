@@ -1,93 +1,102 @@
 const express = require("express");
 const path = require("path");
+const dgram = require("dgram");
+const fs = require("fs");
+const { encryptForClient, decryptFromClient, isClientAuthorized } = require("./cryptoHelper");
 
 const app = express();
-const dgram = require("dgram");
-
+const udpServer = dgram.createSocket("udp4");
 const multicastAddress = "239.255.255.250"; // Endereço Multicast
 const multicastPort = 5000;
-const udpServer = dgram.createSocket("udp4");
 
 app.use(express.json());
+app.use(express.static(path.join(__dirname, "public"))); // Servindo arquivos estáticos
 
-// 🔹 **Aqui servimos os arquivos estáticos (server.html e client.html)**
-app.use(express.static(path.join(__dirname, "public")));
+// 🔹 Rota para clientes se autenticarem no leilão
+app.post("/join-auction", (req, res) => {
+    const { clientId, publicKey } = req.body;
 
-// 🔹 **Agora o navegador pode acessar `server.html` e `client.html` diretamente**
-app.get("/", (req, res) => {
-    res.sendFile(path.join(__dirname, "public", "server.html"));
-});
-
-// Iniciar servidor HTTP
-app.listen(3000, () => console.log("Servidor HTTP rodando em http://localhost:3000"));
-
-let auctionData = {
-    imageUrl: "",
-    value: 0,
-    timeLeft: 60,
-    bids: []
-};
-
-// Iniciar servidor Multicast UDP
-udpServer.bind(multicastPort, () => {
-    udpServer.addMembership(multicastAddress);
-    console.log(`Servidor multicast rodando em ${multicastAddress}:${multicastPort}`);
-});
-
-// Função para enviar mensagens multicast
-function sendMulticastMessage(data) {
-    const message = Buffer.from(JSON.stringify(data));
-    udpServer.send(message, 0, message.length, multicastPort, multicastAddress, (err) => {
-        if (err) console.error("Erro ao enviar multicast:", err);
-    });
-}
-
-// Iniciar leilão
-app.post("/start-auction", (req, res) => {
-    const { imageUrl, value } = req.body;
-
-    if (!imageUrl || !value) {
-        return res.status(400).json({ error: "Imagem e valor inicial são obrigatórios" });
+    if (!isClientAuthorized(publicKey)) {
+        return res.status(403).json({ error: "Acesso negado. Chave pública não autorizada." });
     }
 
-    auctionData.imageUrl = imageUrl;
-    auctionData.value = value;
-    auctionData.timeLeft = 60; // Reinicia o tempo
+    res.json({ message: "Cliente autenticado com sucesso!" });
+});
+
+app.post("/start-auction", (req, res) => {
+    console.log("Recebendo requisição para iniciar leilão:", req.body);
+
+    if (!word || isNaN(value) || value <= 0) {
+        return res.status(400).json({ error: "A palavra e um valor inicial válido são obrigatórios" });
+    }
+
+    auctionData.word = word;
+    auctionData.value = parseFloat(value); 
+    auctionData.timeLeft = 60;
     auctionData.bids = [];
 
-    // Inicia o timer e envia updates via multicast
+    console.log("Leilão iniciado com:", auctionData);
+
     const interval = setInterval(() => {
         auctionData.timeLeft--;
 
-        const message = JSON.stringify(auctionData);
-        udpServer.send(message, multicastPort, multicastAddress);
+        const encryptedAuctionData = {
+            client1: encryptForClient("client1", JSON.stringify(auctionData)),
+            client2: encryptForClient("client2", JSON.stringify(auctionData)),
+        };
+
+        const message = Buffer.from(JSON.stringify(encryptedAuctionData));
+
+        udpServer.send(message, multicastPort, multicastAddress, (err) => {
+            if (err) {
+                console.error("Erro ao enviar dados multicast:", err);
+            } else {
+                console.log("Dados enviados via multicast:", encryptedAuctionData);
+            }
+        });
 
         if (auctionData.timeLeft <= 0) {
             clearInterval(interval);
+            console.log("Leilão encerrado!");
         }
     }, 1000);
 
     res.json({ message: "Leilão iniciado!" });
 });
 
-// Enviar um lance
+
+// 🔹 Rota para receber lances dos clientes
 app.post("/bid", (req, res) => {
-    if (!auctionData.running) {
-        return res.json({ message: "O leilão ainda não começou!" });
+    const { clientId, publicKey } = req.body;
+
+    if (!isClientAuthorized(publicKey)) {
+        return res.status(403).json({ error: "Acesso negado. Chave pública não autorizada." });
     }
 
-    const bidIncrement = auctionData.value * 0.1; // Incremento de 10%
-    auctionData.currentBid += bidIncrement;
+    // 🔹 O lance é sempre 10% acima do valor atual
+    const bidAmount = auctionData.value * 1.1;
+    auctionData.value = bidAmount;
 
-    sendMulticastMessage({ type: "bid", bidValue: auctionData.currentBid });
+    auctionData.bids.push({ clientId, bidAmount });
 
-    res.json({ message: `Lance enviado: R$ ${auctionData.currentBid}` });
+    console.log(`Novo lance de ${clientId}: R$ ${bidAmount}`);
+
+    // 🔹 Envia o lance atualizado para os clientes
+    const encryptedAuctionData = {
+        client1: encryptForClient("client1", JSON.stringify(auctionData)),
+        client2: encryptForClient("client2", JSON.stringify(auctionData)),
+    };
+
+    const message = Buffer.from(JSON.stringify(encryptedAuctionData));
+    udpServer.send(message, multicastPort, multicastAddress);
+
+    res.json({ message: "Lance registrado com sucesso!" });
 });
 
-// Iniciar o servidor HTTP na porta 3000
-app.listen(3000, () => console.log("Servidor HTTP rodando na porta 3000"));
+// 🔹 Iniciar servidor HTTP
+app.listen(3000, () => console.log("Servidor rodando em http://localhost:3000"));
 
-// Iniciar o servidor UDP multicast
+// 🔹 Iniciar servidor UDP Multicast
 udpServer.bind(multicastPort, () => {
     udpServer.addMembership(multicastAddress);
     console.log(`Servidor multicast rodando em ${multicastAddress}:${multicastPort}`);

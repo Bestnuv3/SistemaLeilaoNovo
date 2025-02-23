@@ -2,34 +2,100 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Leilão - Cliente</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+
+        body {
+            background-color: white;
+            color: black;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 30px;
+            background-color: white;
+            border-bottom: 2px solid lightgray;
+        }
+
+        header img {
+            height: 40px;
+        }
+
+        main {
+            padding: 20px;
+            background-color: #b3b3b3;
+            min-height: 80vh;
+            text-align: center;
+        }
+
+        .auction-info {
+            margin: 20px 0;
+            padding: 15px;
+            background: white;
+            border-radius: 10px;
+            display: inline-block;
+            min-width: 300px;
+        }
+
+        #bidsList {
+            margin-top: 20px;
+            text-align: left;
+            display: inline-block;
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
 </head>
 <body>
-    <h2>Leilão em Andamento</h2>
+    <header>
+        <div>
+            <img src="logo.png" alt="Logo" width="25px" height="100px">
+        </div>
+        <h1>Leilão Seguro - Cliente</h1>
+        <p>Julia Koene</p>
+    </header>
 
-    <h3>Tempo Restante: <span id="timeLeft">60</span>s</h3>
-    <p>Valor Atual: R$ <span id="currentBid">0</span></p>
-    <button onclick="sendBid()">Dar Lance (+10%)</button>
+    <main>
+        <h2 id="waitingText">Aguardando leilão...</h2>
+
+        <div id="auctionInfo" class="auction-info hidden">
+            <p>Item Leiloado: <span id="auctionWord">Aguardando...</span></p>
+            <h3>Tempo Restante: <span id="timeLeft">60</span>s</h3>
+            <p>Valor Atual: R$ <span id="currentBid">0</span></p>
+            <button onclick="sendBid()">Dar Lance (+10%)</button>
+        </div>
+
+        <h3 class="hidden" id="bidsTitle">Lances Realizados</h3>
+        <ul id="bidsList" class="hidden"></ul>
+    </main>
 
     <script>
-        const multicastPort = 5000;
-        const multicastAddress = "239.255.255.250";
-
         const socket = new WebSocket("ws://localhost:3000");
 
         socket.onmessage = function(event) {
             const data = JSON.parse(event.data);
 
             if (data.type === "start") {
-                document.getElementById("currentBid").innerText = data.value;
-            } else if (data.type === "timer") {
-                document.getElementById("timeLeft").innerText = data.timeLeft;
-            } else if (data.type === "bid") {
-                document.getElementById("currentBid").innerText = data.bidValue;
-            } else if (data.type === "end") {
-                alert("Leilão encerrado!");
-            }
-        };
+            document.getElementById("auctionWord").innerText = data.word;
+            document.getElementById("currentBid").innerText = data.value;
+        } else if (data.type === "timer") {
+            document.getElementById("timeLeft").innerText = data.timeLeft;
+        } else if (data.type === "bid") {
+            document.getElementById("currentBid").innerText = data.bidValue;
+        } else if (data.type === "end") {
+            alert("Leilão encerrado!");
+        }};
 
         function sendBid() {
             fetch("http://localhost:3000/bid", {
@@ -39,6 +105,12 @@
             .then(response => response.json())
             .then(data => alert(data.message))
             .catch(error => console.error("Erro ao enviar lance:", error));
+        }
+
+        function addBidToList(bidder, bidValue) {
+            const bidItem = document.createElement("li");
+            bidItem.innerText = `${bidder} deu um lance de R$ ${bidValue}`;
+            document.getElementById("bidsList").appendChild(bidItem);
         }
     </script>
 </body>

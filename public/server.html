@@ -84,9 +84,9 @@
             <input type="text" id="initialBid">
             <br><br>
 
-            <p>Escolha uma Imagem para Leiloar</p>
-            <input type="file" id="fileInput" accept="image/*" onchange="readURL(this)">
-            <img src="" alt="Imagem do leilão" id="previewImage" onclick="document.getElementById('fileInput').click();" width="400px" height="300px">
+            <label for="word">Item para Leiloar: </label>
+            <input type="text" id="wordInput">
+            <br><br>
             <button id="startAuction">COMEÇAR LEILÃO</button>
         </section>
 
@@ -98,46 +98,18 @@
         </section>
     </main>
     <script>
-        function readURL(input) {
-            if (input.files && input.files[0]) {
-                var reader = new FileReader();
-                reader.onload = function (e) { 
-                    document.getElementById("previewImage").src = e.target.result;
-                };
-                reader.readAsDataURL(input.files[0]); 
-            }
-        }
-
         document.getElementById("startAuction").addEventListener("click", function() {
-            const inputFile = document.getElementById("fileInput");
-            const initialBid = document.getElementById("initialBid").value;
-            const imageElement = document.getElementById("previewImage");
+            const word = document.getElementById("wordInput").value;
+            const value = parseFloat(document.getElementById("initialBid").value);
 
-            if (!inputFile.files.length || !initialBid) {
-                alert("Selecione uma imagem e informe um valor inicial!");
-                return;
-            }
-
-            const reader = new FileReader();
-            reader.onload = function (e) {
-                fetch("http://localhost:3000/start-auction", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify({
-                        imageUrl: e.target.result, // Envia a imagem como base64
-                        value: parseFloat(initialBid)
-                    })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    alert(data.message);
-                })
-                .catch(error => console.error("Erro ao iniciar o leilão:", error));
-            };
-
-            reader.readAsDataURL(inputFile.files[0]); 
+            fetch("http://localhost:3000/start-auction", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ word, value })
+            })
+            .then(response => response.json())
+            .then(data => alert(data.message))
+            .catch(error => console.error("Erro ao iniciar o leilão:", error));
         });
         </script>
 </body>
